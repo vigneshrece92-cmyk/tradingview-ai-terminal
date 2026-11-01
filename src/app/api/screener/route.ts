@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/navigation';
+import { NextResponse } from 'next/server';
 import { ScreenerItem } from '@/types/trading';
 
 const INITIAL_WATCHLIST: ScreenerItem[] = [

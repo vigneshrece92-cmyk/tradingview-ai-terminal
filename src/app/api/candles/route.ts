@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/navigation';
+import { NextResponse } from 'next/server';
 import { CandleData, Timeframe } from '@/types/trading';
 
 // Map timeframe to Binance interval
