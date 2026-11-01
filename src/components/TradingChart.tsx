@@ -103,6 +103,13 @@ export default function TradingChart({
 
       if (!containerRef.current || !isMounted) return;
 
+      if (chartInstanceRef.current) {
+        try {
+          chartInstanceRef.current.remove();
+        } catch (e) {}
+        chartInstanceRef.current = null;
+      }
+
       containerRef.current.innerHTML = '';
 
       const chartOptions = {
@@ -355,15 +362,33 @@ export default function TradingChart({
 
       // Apply markers if provided
       if (markers && markers.length > 0 && showMarkers) {
-        candleSeries.setMarkers(
-          markers.map((m) => ({
-            time: Number(m.time),
-            position: m.position,
-            color: m.color,
-            shape: m.shape,
-            text: m.text,
-          })) as any
-        );
+        try {
+          // Strictly sort ascending by time and deduplicate timestamps for Lightweight Charts v4
+          const sorted = [...markers]
+            .filter((m) => m && !isNaN(Number(m.time)) && seenTimes.has(Number(m.time)))
+            .sort((a, b) => Number(a.time) - Number(b.time));
+
+          const deduped: any[] = [];
+          const seenMarkerTimes = new Set();
+          for (const m of sorted) {
+            const t = Number(m.time);
+            if (!seenMarkerTimes.has(t)) {
+              seenMarkerTimes.add(t);
+              deduped.push({
+                time: t,
+                position: m.position || 'belowBar',
+                color: m.color || '#10b981',
+                shape: m.shape || 'arrowUp',
+                text: m.text || '',
+              });
+            }
+          }
+          if (deduped.length > 0) {
+            candleSeries.setMarkers(deduped);
+          }
+        } catch (mErr) {
+          console.warn('Marker render safely caught:', mErr);
+        }
       }
 
       // Crosshair move handler
@@ -417,11 +442,13 @@ export default function TradingChart({
       chart.timeScale().fitContent();
 
       const handleResize = () => {
-        if (containerRef.current && chart) {
-          chart.applyOptions({
-            width: containerRef.current.clientWidth,
-            height: containerRef.current.clientHeight,
-          });
+        if (containerRef.current && chartInstanceRef.current) {
+          try {
+            chartInstanceRef.current.applyOptions({
+              width: containerRef.current.clientWidth,
+              height: containerRef.current.clientHeight,
+            });
+          } catch (e) {}
         }
       };
 
@@ -430,7 +457,6 @@ export default function TradingChart({
 
       return () => {
         window.removeEventListener('resize', handleResize);
-        if (chart) chart.remove();
       };
     }
 
@@ -438,7 +464,12 @@ export default function TradingChart({
 
     return () => {
       isMounted = false;
-      if (chart) chart.remove();
+      if (chartInstanceRef.current) {
+        try {
+          chartInstanceRef.current.remove();
+        } catch (e) {}
+        chartInstanceRef.current = null;
+      }
     };
   }, [candles, symbol, timeframe, markers, showMarkers]);
 
@@ -498,12 +529,12 @@ export default function TradingChart({
 
           {displayData && (
             <div className="hidden sm:flex items-center gap-3 font-mono text-slate-300">
-              <span>O: <b className="text-white">${displayData.open?.toFixed(2)}</b></span>
-              <span>H: <b className="text-emerald-400">${displayData.high?.toFixed(2)}</b></span>
-              <span>L: <b className="text-rose-400">${displayData.low?.toFixed(2)}</b></span>
-              <span>C: <b className={displayData.change && displayData.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}>${displayData.close?.toFixed(2)}</b></span>
-              <span className={`px-1.5 py-0.2 rounded text-[11px] font-semibold ${displayData.change && displayData.change >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
-                {displayData.change && displayData.change >= 0 ? '+' : ''}{displayData.change}%
+              <span>O: <b className="text-white">${Number(displayData.open || 0).toFixed(2)}</b></span>
+              <span>H: <b className="text-emerald-400">${Number(displayData.high || 0).toFixed(2)}</b></span>
+              <span>L: <b className="text-rose-400">${Number(displayData.low || 0).toFixed(2)}</b></span>
+              <span>C: <b className={(displayData.change || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}>${Number(displayData.close || 0).toFixed(2)}</b></span>
+              <span className={`px-1.5 py-0.2 rounded text-[11px] font-semibold ${(displayData.change || 0) >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                {(displayData.change || 0) >= 0 ? '+' : ''}{Number(displayData.change || 0).toFixed(2)}%
               </span>
             </div>
           )}

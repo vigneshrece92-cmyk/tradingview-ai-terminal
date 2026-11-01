@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import TradingChart from '@/components/TradingChart';
 import TradingViewLiveChart from '@/components/TradingViewLiveChart';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import TechnicalAnalysisGauge from '@/components/TechnicalAnalysisGauge';
 import ScreenerTable from '@/components/ScreenerTable';
 import AICopilot from '@/components/AICopilot';
@@ -63,13 +64,21 @@ export default function Home() {
     try {
       const res = await fetch(`/api/candles?symbol=${symbol}&timeframe=${timeframe}`);
       const data = await res.json();
-      if (data.success && Array.isArray(data.candles)) {
+      if (data && data.success && Array.isArray(data.candles) && data.candles.length > 0) {
         setCandles(data.candles);
-        const ta = evaluateTechnicalAnalysis(symbol, data.candles);
-        setTechnicalAnalysis(ta);
-        const vp = calculateVolumeProfile(data.candles, 26, 0.70);
-        const signals = generateVolumeProfileSignals(data.candles, vp);
-        setChartMarkers(signals);
+        try {
+          const ta = evaluateTechnicalAnalysis(symbol, data.candles);
+          setTechnicalAnalysis(ta);
+        } catch (taErr) {
+          console.warn('TA calculation error caught:', taErr);
+        }
+        try {
+          const vp = calculateVolumeProfile(data.candles, 26, 0.70);
+          const signals = generateVolumeProfileSignals(data.candles, vp);
+          setChartMarkers(signals);
+        } catch (vpErr) {
+          console.warn('VP signals calculation error caught:', vpErr);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch candles:', err);
@@ -195,7 +204,12 @@ export default function Home() {
             {QUICK_SYMBOLS.map((s) => (
               <button
                 key={s.symbol}
-                onClick={() => setSelectedSymbol(s.symbol)}
+                onClick={() => {
+                  if (selectedSymbol !== s.symbol) {
+                    setChartMarkers([]);
+                    setSelectedSymbol(s.symbol);
+                  }
+                }}
                 className={`px-2 py-0.5 rounded text-xs font-semibold transition-all ${
                   selectedSymbol === s.symbol
                     ? 'bg-blue-600/30 text-blue-300 border border-blue-500/50'
@@ -212,7 +226,12 @@ export default function Home() {
             {TIMEFRAMES.map((tf) => (
               <button
                 key={tf}
-                onClick={() => setSelectedTimeframe(tf)}
+                onClick={() => {
+                  if (selectedTimeframe !== tf) {
+                    setChartMarkers([]);
+                    setSelectedTimeframe(tf);
+                  }
+                }}
                 className={`px-2 py-0.5 rounded text-xs font-mono font-medium transition-all ${
                   selectedTimeframe === tf
                     ? 'bg-slate-700 text-white font-bold'
@@ -283,22 +302,29 @@ export default function Home() {
 
               {/* Chart Area */}
               <div className="flex-1 min-h-[520px]">
-                {chartEngine === 'tradingview' ? (
-                  <TradingViewLiveChart
-                    symbol={selectedSymbol}
-                    timeframe={selectedTimeframe}
-                    onSwitchToOrderFlow={() => setChartEngine('quant')}
-                  />
-                ) : (
-                  <TradingChart
-                    symbol={selectedSymbol}
-                    timeframe={selectedTimeframe}
-                    candles={candles}
-                    markers={chartMarkers}
-                    isLoading={isLoadingCandles}
-                    onRefresh={() => loadCandles(selectedSymbol, selectedTimeframe)}
-                  />
-                )}
+                <ErrorBoundary
+                  fallbackTitle="Chart Engine Reset"
+                  onReset={() => loadCandles(selectedSymbol, selectedTimeframe)}
+                >
+                  {chartEngine === 'tradingview' ? (
+                    <TradingViewLiveChart
+                      key={`tv-${selectedSymbol}-${selectedTimeframe}`}
+                      symbol={selectedSymbol}
+                      timeframe={selectedTimeframe}
+                      onSwitchToOrderFlow={() => setChartEngine('quant')}
+                    />
+                  ) : (
+                    <TradingChart
+                      key={`quant-${selectedSymbol}-${selectedTimeframe}`}
+                      symbol={selectedSymbol}
+                      timeframe={selectedTimeframe}
+                      candles={candles}
+                      markers={chartMarkers}
+                      isLoading={isLoadingCandles}
+                      onRefresh={() => loadCandles(selectedSymbol, selectedTimeframe)}
+                    />
+                  )}
+                </ErrorBoundary>
               </div>
 
               {/* Technical Analysis Gauge */}
