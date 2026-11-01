@@ -665,9 +665,12 @@ export default function TradingChart({
       )}
 
       {/* Main Chart Canvas Area */}
-      <div className="relative flex-1 w-full min-h-[460px]" style={{ minHeight: '460px', height: '480px' }} ref={containerRef}>
+      <div className="relative flex-1 w-full min-h-[460px]" style={{ minHeight: '460px', height: '480px' }}>
+        {/* Dedicated Unmanaged Leaf Node for Lightweight Charts Canvas */}
+        <div ref={containerRef} className="w-full h-full" style={{ width: '100%', height: '100%' }} />
+
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#0d111a]/80 backdrop-blur-xs z-10">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0d111a]/80 backdrop-blur-xs z-10 pointer-events-none">
             <div className="flex flex-col items-center gap-2">
               <RefreshCw size={26} className="animate-spin text-blue-500" />
               <span className="text-xs text-slate-400 font-mono">Fetching live candles...</span>
@@ -676,7 +679,7 @@ export default function TradingChart({
         )}
 
         {/* Chart Watermark */}
-        <div className="absolute top-4 left-4 pointer-events-none select-none opacity-10">
+        <div className="absolute top-4 left-4 pointer-events-none select-none opacity-10 z-0">
           <span className="text-5xl font-black tracking-widest text-white">{symbol}</span>
         </div>
       </div>

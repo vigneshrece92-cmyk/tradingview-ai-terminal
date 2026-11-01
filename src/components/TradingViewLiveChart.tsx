@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef, memo, useState } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 import { Timeframe } from '@/types/trading';
-import { Radio, ExternalLink, Layers, RefreshCw } from 'lucide-react';
+import { Radio, ExternalLink, Layers } from 'lucide-react';
 
 interface TradingViewLiveChartProps {
   symbol: string;
@@ -42,37 +42,27 @@ function TradingViewLiveChartComponent({
   onSwitchToOrderFlow,
 }: TradingViewLiveChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [hasScriptError, setHasScriptError] = useState(false);
 
   const tvSymbol = TRADINGVIEW_SYMBOL_MAP[symbol.toUpperCase()] || `OANDA:${symbol.toUpperCase()}`;
   const tvInterval = TRADINGVIEW_INTERVAL_MAP[timeframe] || '60';
 
   useEffect(() => {
-    const currentContainer = containerRef.current;
-    if (!currentContainer) return;
+    const el = containerRef.current;
+    if (!el) return;
 
-    setHasScriptError(false);
-
-    // Create an isolated sub-container so React DOM reconciler never collides with TradingView
-    const wrapper = document.createElement('div');
-    wrapper.className = 'tradingview-widget-container';
-    wrapper.style.height = '100%';
-    wrapper.style.width = '100%';
+    // Clean previous content safely in unmanaged leaf node
+    el.innerHTML = '';
 
     const widgetDiv = document.createElement('div');
     widgetDiv.className = 'tradingview-widget-container__widget';
     widgetDiv.style.height = '100%';
     widgetDiv.style.width = '100%';
-    wrapper.appendChild(widgetDiv);
+    el.appendChild(widgetDiv);
 
     const script = document.createElement('script');
     script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
     script.type = 'text/javascript';
     script.async = true;
-    script.onerror = () => {
-      setHasScriptError(true);
-    };
-
     script.innerHTML = JSON.stringify({
       autosize: true,
       symbol: tvSymbol,
@@ -97,21 +87,11 @@ function TradingViewLiveChartComponent({
       container_id: undefined,
     });
 
-    try {
-      wrapper.appendChild(script);
-      currentContainer.appendChild(wrapper);
-    } catch (err) {
-      console.warn('TradingView mount error safely caught:', err);
-    }
+    el.appendChild(script);
 
     return () => {
-      // Safely remove wrapper without causing React DOM removeChild collisions
-      try {
-        if (currentContainer && wrapper.parentNode === currentContainer) {
-          currentContainer.removeChild(wrapper);
-        }
-      } catch (err) {
-        console.warn('TradingView unmount cleanup safely handled:', err);
+      if (el) {
+        el.innerHTML = '';
       }
     };
   }, [tvSymbol, tvInterval]);
@@ -138,7 +118,7 @@ function TradingViewLiveChartComponent({
           {onSwitchToOrderFlow && (
             <button
               onClick={onSwitchToOrderFlow}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 text-xs font-bold transition-all shadow-sm"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 text-xs font-bold transition-all shadow-sm cursor-pointer"
               title="Switch to Quant Order Flow with Candle Delta & Trade Hold Signals"
             >
               <Layers size={13} />
@@ -159,25 +139,13 @@ function TradingViewLiveChartComponent({
         </div>
       </div>
 
-      {/* Live TradingView Widget Container */}
-      <div
-        key={`${tvSymbol}-${tvInterval}`}
-        className="relative flex-1 w-full min-h-[520px] bg-[#0d111a]"
-        ref={containerRef}
-      >
-        {hasScriptError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-slate-400 gap-3">
-            <p className="text-xs font-mono">Unable to connect to external TradingView script.</p>
-            {onSwitchToOrderFlow && (
-              <button
-                onClick={onSwitchToOrderFlow}
-                className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold"
-              >
-                Switch to Quant Order Flow Engine
-              </button>
-            )}
-          </div>
-        )}
+      {/* Pure unmanaged leaf node for TradingView DOM injection with zero React children */}
+      <div className="relative flex-1 w-full min-h-[520px] bg-[#0d111a]">
+        <div
+          ref={containerRef}
+          className="w-full h-full"
+          style={{ width: '100%', height: '100%', minHeight: '520px' }}
+        />
       </div>
     </div>
   );

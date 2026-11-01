@@ -301,21 +301,23 @@ export default function Home() {
               </div>
 
               {/* Chart Area */}
-              <div className="flex-1 min-h-[520px]">
+              <div className="flex-1 min-h-[520px] relative">
                 <ErrorBoundary
                   fallbackTitle="Chart Engine Reset"
                   onReset={() => loadCandles(selectedSymbol, selectedTimeframe)}
                 >
-                  {chartEngine === 'tradingview' ? (
+                  {/* TradingView Live Engine: toggled via CSS visibility to eliminate unmount/remount collisions */}
+                  <div className={chartEngine === 'tradingview' ? 'w-full h-full' : 'hidden'}>
                     <TradingViewLiveChart
-                      key={`tv-${selectedSymbol}-${selectedTimeframe}`}
                       symbol={selectedSymbol}
                       timeframe={selectedTimeframe}
                       onSwitchToOrderFlow={() => setChartEngine('quant')}
                     />
-                  ) : (
+                  </div>
+
+                  {/* Quant Order Flow Engine: toggled via CSS visibility to eliminate unmount/remount collisions */}
+                  <div className={chartEngine === 'quant' ? 'w-full h-full' : 'hidden'}>
                     <TradingChart
-                      key={`quant-${selectedSymbol}-${selectedTimeframe}`}
                       symbol={selectedSymbol}
                       timeframe={selectedTimeframe}
                       candles={candles}
@@ -323,7 +325,7 @@ export default function Home() {
                       isLoading={isLoadingCandles}
                       onRefresh={() => loadCandles(selectedSymbol, selectedTimeframe)}
                     />
-                  )}
+                  </div>
                 </ErrorBoundary>
               </div>
 
