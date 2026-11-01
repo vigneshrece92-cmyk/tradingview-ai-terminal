@@ -343,7 +343,7 @@ export default function TradingChart({
       </div>
 
       {/* Main Chart Canvas Area */}
-      <div className="relative flex-1 w-full min-h-[420px]" ref={containerRef}>
+      <div className="relative flex-1 w-full min-h-[460px]" style={{ minHeight: '460px', height: '480px' }} ref={containerRef}>
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#0d111a]/80 backdrop-blur-xs z-10">
             <div className="flex flex-col items-center gap-2">

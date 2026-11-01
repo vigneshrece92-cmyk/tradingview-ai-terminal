@@ -13,7 +13,29 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark h-full">
-      <body className="h-full bg-[#0b0e14] text-slate-100 antialiased selection:bg-blue-600 selection:text-white">
+      <head>
+        {/* Tailwind CDN as an immediate JIT fallback guaranteeing full CSS rendering */}
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              tailwind.config = {
+                darkMode: 'class',
+                theme: {
+                  extend: {
+                    colors: {
+                      dark: '#090d14',
+                      panel: '#111723',
+                      card: '#0d111a',
+                    }
+                  }
+                }
+              }
+            `,
+          }}
+        />
+      </head>
+      <body className="min-h-full bg-[#090d14] text-slate-100 antialiased selection:bg-blue-600 selection:text-white">
         {children}
       </body>
     </html>

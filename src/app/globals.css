@@ -1,41 +1,65 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@layer base {
-  :root {
-    --background: #0b0e14;
-    --card: #121721;
-    --card-hover: #18202e;
-    --border: #1e293b;
-    --primary: #2563eb;
-    --primary-hover: #1d4ed8;
-    --bullish: #10b981;
-    --bearish: #ef4444;
-    --neutral: #94a3b8;
-  }
+:root {
+  --background: #090d14;
+  --foreground: #f1f5f9;
 }
 
-body {
-  background-color: #0b0e14;
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: #090d14;
   color: #f1f5f9;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   overflow-x: hidden;
 }
 
-/* Custom scrollbars for trading panels */
+/* Explicit Layout Styles */
+.terminal-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .terminal-layout {
+    grid-template-columns: 8fr 4fr;
+  }
+}
+
+.chart-card {
+  min-height: 480px;
+  height: 500px;
+  background-color: #0d111a;
+  border-radius: 12px;
+  border: 1px solid #1e293b;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #090d14;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #1e293b;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #334155;
 }
