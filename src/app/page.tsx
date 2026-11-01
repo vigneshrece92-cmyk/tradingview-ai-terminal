@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import TradingChart from '@/components/TradingChart';
+import TradingViewLiveChart from '@/components/TradingViewLiveChart';
 import TechnicalAnalysisGauge from '@/components/TechnicalAnalysisGauge';
 import ScreenerTable from '@/components/ScreenerTable';
 import AICopilot from '@/components/AICopilot';
@@ -21,6 +22,7 @@ import {
   Flame,
   Layers,
   Play,
+  Radio,
   ShieldAlert,
   Sparkles,
   TrendingUp,
@@ -43,8 +45,9 @@ const TIMEFRAMES: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1D'];
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'terminal' | 'orderflow' | 'backtest' | 'matrix' | 'risk' | 'pinescript'>('terminal');
+  const [chartEngine, setChartEngine] = useState<'tradingview' | 'quant'>('tradingview');
   const [sidebarTab, setSidebarTab] = useState<'copilot' | 'screener'>('copilot');
-  const [selectedSymbol, setSelectedSymbol] = useState('BTCUSDT');
+  const [selectedSymbol, setSelectedSymbol] = useState('XAUUSD');
   const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>('1h');
 
   const [candles, setCandles] = useState<CandleData[]>([]);
@@ -220,7 +223,7 @@ export default function Home() {
           {/* Live Indicator Pulse */}
           <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[11px] font-mono border border-emerald-500/20">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Binance API Connected</span>
+            <span>Live WebSocket Market Feed</span>
           </div>
         </div>
       </header>
@@ -230,16 +233,68 @@ export default function Home() {
         {activeTab === 'terminal' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1 min-h-[700px]">
             {/* Left 8 Cols: Interactive Chart with Supertrend/Bollinger + Technical Indicators Gauge */}
-            <div className="lg:col-span-8 flex flex-col gap-3">
-              <div className="flex-1 min-h-[480px]">
-                <TradingChart
-                  symbol={selectedSymbol}
-                  timeframe={selectedTimeframe}
-                  candles={candles}
-                  markers={chartMarkers}
-                  isLoading={isLoadingCandles}
-                  onRefresh={() => loadCandles(selectedSymbol, selectedTimeframe)}
-                />
+            <div className="lg:col-span-8 flex flex-col gap-2">
+              {/* Chart Engine Switcher Header */}
+              <div className="flex items-center justify-between px-3 py-1.5 bg-[#0e1422] rounded-xl border border-slate-800 flex-wrap gap-2">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setChartEngine('tradingview')}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      chartEngine === 'tradingview'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'text-slate-400 hover:text-slate-200 bg-slate-800/50'
+                    }`}
+                  >
+                    <Radio size={12} className={chartEngine === 'tradingview' ? 'text-emerald-300 animate-pulse' : ''} />
+                    <span>TradingView Live (Real-Time Chart)</span>
+                    <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-mono font-black">
+                      LIVE
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => setChartEngine('quant')}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      chartEngine === 'quant'
+                        ? 'bg-indigo-600 text-white shadow-md'
+                        : 'text-slate-400 hover:text-slate-200 bg-slate-800/50'
+                    }`}
+                  >
+                    <Layers size={12} />
+                    <span>Quant Order Flow & Delta</span>
+                    <span className="px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 text-[9px] font-mono font-black">
+                      POC/DELTA
+                    </span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs font-mono">
+                  <span className="text-slate-400">Pair:</span>
+                  <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 font-bold">
+                    {selectedSymbol}
+                  </span>
+                  <span className="text-slate-500">{selectedTimeframe}</span>
+                </div>
+              </div>
+
+              {/* Chart Area */}
+              <div className="flex-1 min-h-[520px]">
+                {chartEngine === 'tradingview' ? (
+                  <TradingViewLiveChart
+                    symbol={selectedSymbol}
+                    timeframe={selectedTimeframe}
+                    onSwitchToOrderFlow={() => setChartEngine('quant')}
+                  />
+                ) : (
+                  <TradingChart
+                    symbol={selectedSymbol}
+                    timeframe={selectedTimeframe}
+                    candles={candles}
+                    markers={chartMarkers}
+                    isLoading={isLoadingCandles}
+                    onRefresh={() => loadCandles(selectedSymbol, selectedTimeframe)}
+                  />
+                )}
               </div>
 
               {/* Technical Analysis Gauge */}
