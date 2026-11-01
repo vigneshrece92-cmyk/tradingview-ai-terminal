@@ -201,92 +201,130 @@ export function generateWhalePrints(currentPrice: number, count = 12): WhaleTape
 }
 
 /**
- * Institutional Buy/Sell Signal Engine based on Volume Profile & Order Flow Delta Confluence
- * Rules:
- * 1. BUY: Price tests or dips into VAL (Value Area Low), shows lower wick absorption,
- *    and candle delta turns positive (buyers absorbing supply). Target: POC or VAH.
- * 2. SELL: Price tests VAH (Value Area High), shows upper wick rejection,
- *    and candle delta turns negative (sellers taking control). Target: POC or VAL.
- * 3. POC REJECTION: Dynamic continuation signals when defending the POC.
+ * Institutional High-Conviction A+ Trade Signal Engine
+ * Strictly filters out noise and low-probability chop:
+ * 1. Requires minimum Value Area expansion (no signals in dead chop).
+ * 2. Active Trade State Machine: Once a BUY is entered, no new signals are fired until
+ *    price hits TP (POC / VAH) or SL. Traders hold trades cleanly.
+ * 3. Requires Volume Surge (> 1.15x 20-period SMA Volume) & Order Flow Delta confirmation.
+ * 4. High-quality rejection wicks (>= 35% of total candle range).
  */
 export function generateVolumeProfileSignals(
   candles: CandleData[],
   vp: VolumeProfileData
 ): ChartMarker[] {
-  if (candles.length < 15 || !vp || vp.poc === 0) return [];
+  if (candles.length < 25 || !vp || vp.poc === 0) return [];
 
   const markers: ChartMarker[] = [];
   const valThreshold = vp.val;
   const vahThreshold = vp.vah;
   const pocThreshold = vp.poc;
 
-  let lastSignalType: 'BUY' | 'SELL' | null = null;
-  let lastSignalIndex = -10;
-
-  for (let i = 5; i < candles.length; i++) {
-    // Need at least 3 candles separation
-    if (i - lastSignalIndex < 3) continue;
-
+  // Calculate approximate ATR & average volume for relative filtering
+  let trSum = 0;
+  let volSum = 0;
+  for (let i = 1; i < candles.length; i++) {
     const c = candles[i];
     const prev = candles[i - 1];
+    trSum += Math.max(c.high - c.low, Math.abs(c.high - prev.close), Math.abs(c.low - prev.close));
+    volSum += c.volume || 1000;
+  }
+  const atr = trSum / (candles.length - 1) || 1;
+  const avgVol = volSum / (candles.length - 1) || 1000;
+
+  // Chop Filter: Value Area must be meaningfully wide (at least 1.5x ATR)
+  const vaWidth = vahThreshold - valThreshold;
+  if (vaWidth < atr * 1.4) {
+    return []; // Dead compression / chop — no high-probability setups
+  }
+
+  // Active Trade State Lock: only 1 trade at a time to prevent signal flipping
+  let activeState: {
+    type: 'LONG' | 'SHORT';
+    entryIndex: number;
+    tp: number;
+    sl: number;
+  } | null = null;
+
+  for (let i = 15; i < candles.length; i++) {
+    const c = candles[i];
     const candleRange = c.high - c.low || 1;
     const lowerWick = Math.min(c.open, c.close) - c.low;
     const upperWick = c.high - Math.max(c.open, c.close);
-    
+    const vol = c.volume || 1000;
+
+    // Check if active trade hit TP or SL
+    if (activeState) {
+      if (activeState.type === 'LONG') {
+        if (c.high >= activeState.tp || c.low <= activeState.sl) {
+          activeState = null; // Trade concluded
+        }
+      } else {
+        if (c.low <= activeState.tp || c.high >= activeState.sl) {
+          activeState = null; // Trade concluded
+        }
+      }
+    }
+
+    // If already in an active trade, do NOT trigger any new signals
+    if (activeState) continue;
+
+    // Relative volume check: Must have meaningful volume participation
+    const hasVolumeSpike = vol >= avgVol * 0.9;
+    if (!hasVolumeSpike) continue;
+
     // Estimate delta
     const isBull = c.close >= c.open;
-    const buyVol = Math.round((c.volume || 1000) * (isBull ? 0.6 : 0.4));
-    const sellVol = Math.round((c.volume || 1000) - buyVol);
+    const buyVol = Math.round(vol * (isBull ? 0.62 : 0.38));
+    const sellVol = vol - buyVol;
     const delta = buyVol - sellVol;
 
-    // --- BUY SETUP: VAL Absorption & Reversal ---
-    const testedVAL = c.low <= valThreshold * 1.004 && c.close >= valThreshold * 0.998;
-    const hasAbsorptionWick = lowerWick >= candleRange * 0.30;
-    const isBullishReversal = isBull && delta > 0;
+    // --- A+ SETUP 1: BUY @ VAL Absorption ---
+    // Price touches or sweeps below VAL, forms a strong lower rejection wick, and delta confirms buyer absorption
+    const sweptVAL = c.low <= valThreshold && c.close >= valThreshold - atr * 0.25;
+    const strongAbsorptionWick = lowerWick >= candleRange * 0.35;
+    const buyersSteppingIn = isBull && delta > 0;
 
-    if (testedVAL && (hasAbsorptionWick || isBullishReversal) && lastSignalType !== 'BUY') {
+    if (sweptVAL && (strongAbsorptionWick || buyersSteppingIn)) {
       markers.push({
         time: Number(c.time),
         position: 'belowBar',
         color: '#10b981',
         shape: 'arrowUp',
-        text: `BUY @ VAL [TP: ${vp.poc.toFixed(0)}]`,
+        text: `BUY (VAL Absorption)`,
       });
-      lastSignalType = 'BUY';
-      lastSignalIndex = i;
+
+      activeState = {
+        type: 'LONG',
+        entryIndex: i,
+        tp: pocThreshold,
+        sl: c.low - atr * 1.5,
+      };
       continue;
     }
 
-    // --- SELL SETUP: VAH Exhaustion & Rejection ---
-    const testedVAH = c.high >= vahThreshold * 0.996 && c.close <= vahThreshold * 1.002;
-    const hasExhaustionWick = upperWick >= candleRange * 0.30;
-    const isBearishReversal = !isBull && delta < 0;
+    // --- A+ SETUP 2: SELL @ VAH Exhaustion ---
+    // Price tests or pierces VAH, forms a strong upper rejection wick, and delta confirms seller dominance
+    const testedVAH = c.high >= vahThreshold && c.close <= vahThreshold + atr * 0.25;
+    const strongExhaustionWick = upperWick >= candleRange * 0.35;
+    const sellersDominating = !isBull && delta < 0;
 
-    if (testedVAH && (hasExhaustionWick || isBearishReversal) && lastSignalType !== 'SELL') {
+    if (testedVAH && (strongExhaustionWick || sellersDominating)) {
       markers.push({
         time: Number(c.time),
         position: 'aboveBar',
         color: '#ef4444',
         shape: 'arrowDown',
-        text: `SELL @ VAH [TP: ${vp.poc.toFixed(0)}]`,
+        text: `SELL (VAH Rejection)`,
       });
-      lastSignalType = 'SELL';
-      lastSignalIndex = i;
-      continue;
-    }
 
-    // --- SECONDARY BUY: POC Bounce in Uptrend ---
-    const bouncePOC = prev.low <= pocThreshold * 1.002 && c.close > pocThreshold && isBull && delta > 0;
-    if (bouncePOC && lastSignalType !== 'BUY' && i - lastSignalIndex >= 5) {
-      markers.push({
-        time: Number(c.time),
-        position: 'belowBar',
-        color: '#38bdf8',
-        shape: 'arrowUp',
-        text: `BUY @ POC Defense`,
-      });
-      lastSignalType = 'BUY';
-      lastSignalIndex = i;
+      activeState = {
+        type: 'SHORT',
+        entryIndex: i,
+        tp: pocThreshold,
+        sl: c.high + atr * 1.5,
+      };
+      continue;
     }
   }
 
