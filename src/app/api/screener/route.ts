@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { ScreenerItem } from '@/types/trading';
 
 const INITIAL_WATCHLIST: ScreenerItem[] = [
+  { symbol: 'XAUUSD', name: 'Gold Spot / US Dollar', market: 'stocks', price: 2748.5, change24h: 1.45, volume: '8.4B', rsi: 65.2, recommendation: 'STRONG_BUY', squeeze: true },
   { symbol: 'BTCUSDT', name: 'Bitcoin', market: 'crypto', price: 69450.0, change24h: 3.42, volume: '2.8B', rsi: 62.4, recommendation: 'STRONG_BUY', squeeze: false },
   { symbol: 'ETHUSDT', name: 'Ethereum', market: 'crypto', price: 2548.2, change24h: 1.85, volume: '1.2B', rsi: 54.1, recommendation: 'BUY', squeeze: true },
   { symbol: 'SOLUSDT', name: 'Solana', market: 'crypto', price: 184.6, change24h: 6.72, volume: '950M', rsi: 68.9, recommendation: 'STRONG_BUY', squeeze: false },

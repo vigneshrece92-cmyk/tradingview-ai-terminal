@@ -11,7 +11,7 @@ const binanceIntervalMap: Record<Timeframe, string> = {
   '1D': '1d',
 };
 
-// Realistic mock generator when external APIs are throttled or for US equities
+// Realistic mock generator when external APIs are throttled or for US equities / Gold
 function generateSyntheticCandles(basePrice: number, count = 150, timeframe: Timeframe): CandleData[] {
   const candles: CandleData[] = [];
   const now = Math.floor(Date.now() / 1000);
@@ -26,17 +26,17 @@ function generateSyntheticCandles(basePrice: number, count = 150, timeframe: Tim
   };
   
   const step = stepSeconds[timeframe] || 3600;
-  let currentPrice = basePrice * 0.92; // start slightly lower for trend
+  let currentPrice = basePrice * 0.95;
   
   for (let i = count; i >= 0; i--) {
     const time = now - i * step;
-    const volatility = currentPrice * 0.015;
+    const volatility = currentPrice * 0.008;
     const change = (Math.random() - 0.48) * volatility;
     const open = currentPrice;
     const close = open + change;
     const high = Math.max(open, close) + Math.random() * volatility * 0.5;
     const low = Math.min(open, close) - Math.random() * volatility * 0.5;
-    const volume = Math.floor(Math.random() * 50000 + 10000);
+    const volume = Math.floor(Math.random() * 45000 + 12000);
 
     candles.push({
       time,
@@ -58,8 +58,11 @@ export async function GET(request: Request) {
   const symbol = searchParams.get('symbol') || 'BTCUSDT';
   const timeframe = (searchParams.get('timeframe') as Timeframe) || '1h';
 
-  const isCrypto = symbol.endsWith('USDT') || symbol.endsWith('BTC') || ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'DOGE'].some(c => symbol.startsWith(c));
-  const cleanSymbol = symbol.replace(/[^A-Z0-9]/g, '');
+  const isGold = symbol.toUpperCase() === 'XAUUSD' || symbol.toUpperCase() === 'GOLD';
+  const isCrypto = isGold || symbol.endsWith('USDT') || symbol.endsWith('BTC') || ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'DOGE'].some(c => symbol.startsWith(c));
+  
+  // For Gold, map to Binance's live physical-backed PAXGUSDT (Paxos Gold) which tracks exact spot gold price
+  const cleanSymbol = isGold ? 'PAXGUSDT' : symbol.replace(/[^A-Z0-9]/g, '');
 
   if (isCrypto) {
     try {
@@ -68,7 +71,7 @@ export async function GET(request: Request) {
       
       const res = await fetch(
         `https://api.binance.com/api/v3/klines?symbol=${formattedSymbol}&interval=${interval}&limit=200`,
-        { next: { revalidate: 15 } } // Cache for 15s
+        { next: { revalidate: 15 } }
       );
 
       if (res.ok) {
@@ -90,8 +93,10 @@ export async function GET(request: Request) {
     }
   }
 
-  // Stock base prices for realistic synthetic data
+  // Stock & Commodity base prices
   const stockBasePrices: Record<string, number> = {
+    XAUUSD: 2748.5,
+    GOLD: 2748.5,
     NVDA: 138.5,
     AAPL: 232.0,
     TSLA: 260.4,

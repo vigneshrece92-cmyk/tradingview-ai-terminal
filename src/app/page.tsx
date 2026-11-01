@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 
 const QUICK_SYMBOLS = [
+  { symbol: 'XAUUSD', label: 'GOLD (XAU)' },
   { symbol: 'BTCUSDT', label: 'BTC' },
   { symbol: 'ETHUSDT', label: 'ETH' },
   { symbol: 'SOLUSDT', label: 'SOL' },
