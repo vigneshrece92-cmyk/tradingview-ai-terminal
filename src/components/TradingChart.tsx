@@ -3,7 +3,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { CandleData, ChartMarker } from '@/types/trading';
 import { calculateEMA } from '@/lib/indicators';
-import { Eye, EyeOff, Maximize2, RefreshCw, Sparkles, TrendingUp, Zap } from 'lucide-react';
+import { calculateVolumeProfile } from '@/lib/orderflow';
+import { Eye, EyeOff, Maximize2, RefreshCw, Sparkles, TrendingUp, Waves, Zap } from 'lucide-react';
 
 interface TradingChartProps {
   symbol: string;
@@ -38,6 +39,7 @@ export default function TradingChart({
   const [showEMA200, setShowEMA200] = useState(false);
   const [showBollinger, setShowBollinger] = useState(false);
   const [showSupertrend, setShowSupertrend] = useState(true);
+  const [showVolumeProfile, setShowVolumeProfile] = useState(true);
   const [showMarkers, setShowMarkers] = useState(true);
 
   const [hoverData, setHoverData] = useState<{
@@ -254,7 +256,36 @@ export default function TradingChart({
       ema200Series.applyOptions({ visible: showEMA200 });
       bbUpperSeries.applyOptions({ visible: showBollinger });
       bbLowerSeries.applyOptions({ visible: showBollinger });
-      supertrendSeries.applyOptions({ visible: showSupertrend });
+      // Volume Profile Price Lines (POC, VAH, VAL)
+      if (showVolumeProfile) {
+        const vp = calculateVolumeProfile(uniqueCandles, 24, 0.70);
+        if (vp.poc > 0) {
+          candleSeries.createPriceLine({
+            price: vp.poc,
+            color: '#f59e0b',
+            lineWidth: 2,
+            lineStyle: 0,
+            axisLabelVisible: true,
+            title: 'POC',
+          });
+          candleSeries.createPriceLine({
+            price: vp.vah,
+            color: '#38bdf8',
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: true,
+            title: 'VAH',
+          });
+          candleSeries.createPriceLine({
+            price: vp.val,
+            color: '#06b6d4',
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: true,
+            title: 'VAL',
+          });
+        }
+      }
 
       // Apply markers if provided
       if (markers && markers.length > 0 && showMarkers) {
@@ -396,6 +427,15 @@ export default function TradingChart({
             }`}
           >
             <TrendingUp size={11} /> SuperTrend
+          </button>
+
+          <button
+            onClick={() => setShowVolumeProfile(!showVolumeProfile)}
+            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+              showVolumeProfile ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-slate-800/50 text-slate-500'
+            }`}
+          >
+            <Waves size={11} /> POC / VAH / VAL
           </button>
 
           <button

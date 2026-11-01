@@ -96,3 +96,46 @@ export interface ChartMarker {
   shape: 'arrowUp' | 'arrowDown' | 'circle';
   text: string;
 }
+
+// Institutional Volume Profile Types
+export interface VolumeProfileBucket {
+  price: number;
+  volume: number;
+  buyVolume: number;
+  sellVolume: number;
+  delta: number;
+  isPOC: boolean;
+  isVAH: boolean;
+  isVAL: boolean;
+  isInValueArea: boolean;
+}
+
+export interface VolumeProfileData {
+  poc: number; // Point of Control
+  vah: number; // Value Area High (70% Volume)
+  val: number; // Value Area Low (70% Volume)
+  totalVolume: number;
+  valueAreaVolume: number;
+  buckets: VolumeProfileBucket[];
+}
+
+// Institutional Order Flow & Cumulative Volume Delta (CVD)
+export interface OrderFlowBar {
+  time: number;
+  price: number;
+  buyVolume: number;
+  sellVolume: number;
+  delta: number;
+  cvd: number;
+  imbalance: 'BUY_IMBALANCE' | 'SELL_IMBALANCE' | 'NEUTRAL';
+}
+
+export interface WhaleTapePrint {
+  id: string;
+  time: string;
+  price: number;
+  size: number;
+  valueUsd: number;
+  side: 'BUY' | 'SELL';
+  isAggressive: boolean;
+}

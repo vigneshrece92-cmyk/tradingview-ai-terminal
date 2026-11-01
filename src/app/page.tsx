@@ -9,6 +9,7 @@ import PineScriptStudio from '@/components/PineScriptStudio';
 import BacktestEngine from '@/components/BacktestEngine';
 import TimeframeMatrix from '@/components/TimeframeMatrix';
 import RiskCalculator from '@/components/RiskCalculator';
+import OrderFlowPanel from '@/components/OrderFlowPanel';
 import { CandleData, ChartMarker, ScreenerItem, TechnicalAnalysis, Timeframe } from '@/types/trading';
 import { evaluateTechnicalAnalysis } from '@/lib/indicators';
 import {
@@ -23,6 +24,7 @@ import {
   ShieldAlert,
   Sparkles,
   TrendingUp,
+  Waves,
   Zap,
 } from 'lucide-react';
 
@@ -39,7 +41,7 @@ const QUICK_SYMBOLS = [
 const TIMEFRAMES: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1D'];
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'terminal' | 'backtest' | 'matrix' | 'risk' | 'pinescript'>('terminal');
+  const [activeTab, setActiveTab] = useState<'terminal' | 'orderflow' | 'backtest' | 'matrix' | 'risk' | 'pinescript'>('terminal');
   const [sidebarTab, setSidebarTab] = useState<'copilot' | 'screener'>('copilot');
   const [selectedSymbol, setSelectedSymbol] = useState('BTCUSDT');
   const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>('1h');
@@ -125,6 +127,16 @@ export default function Home() {
           >
             <BarChart2 size={13} />
             <span>Chart Terminal</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('orderflow')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all whitespace-nowrap ${
+              activeTab === 'orderflow' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Waves size={13} />
+            <span>Order Flow & VRVP</span>
           </button>
 
           <button
@@ -279,6 +291,17 @@ export default function Home() {
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Order Flow & Volume Profile Tab */}
+        {activeTab === 'orderflow' && (
+          <div className="flex-1 min-h-[650px]">
+            <OrderFlowPanel
+              symbol={selectedSymbol}
+              timeframe={selectedTimeframe}
+              candles={candles}
+            />
           </div>
         )}
 
