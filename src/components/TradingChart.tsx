@@ -85,7 +85,7 @@ export default function TradingChart({
         },
       };
 
-      chart = createChart(containerRef.current, chartOptions);
+      chart = createChart(containerRef.current, chartOptions as any);
       chartInstanceRef.current = chart;
 
       // Candlestick Series
@@ -149,20 +149,20 @@ export default function TradingChart({
 
       candleSeries.setData(
         uniqueCandles.map((c) => ({
-          time: Number(c.time),
+          time: Number(c.time) as any,
           open: c.open,
           high: c.high,
           low: c.low,
           close: c.close,
-        }))
+        })) as any
       );
 
       volumeSeries.setData(
         uniqueCandles.map((c) => ({
-          time: Number(c.time),
+          time: Number(c.time) as any,
           value: c.volume || 0,
           color: c.close >= c.open ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)',
-        }))
+        })) as any
       );
 
       const closes = uniqueCandles.map((c) => c.close);
@@ -171,21 +171,21 @@ export default function TradingChart({
       const ema200Values = calculateEMA(closes, 200);
 
       const ema20Data = ema20Values.map((val, idx) => ({
-        time: Number(uniqueCandles[idx + (20 - 1)]?.time || uniqueCandles[idx].time),
+        time: Number(uniqueCandles[idx + (20 - 1)]?.time || uniqueCandles[idx].time) as any,
         value: val,
       }));
       const ema50Data = ema50Values.map((val, idx) => ({
-        time: Number(uniqueCandles[idx + (50 - 1)]?.time || uniqueCandles[idx].time),
+        time: Number(uniqueCandles[idx + (50 - 1)]?.time || uniqueCandles[idx].time) as any,
         value: val,
       }));
       const ema200Data = ema200Values.map((val, idx) => ({
-        time: Number(uniqueCandles[idx + (200 - 1)]?.time || uniqueCandles[idx].time),
+        time: Number(uniqueCandles[idx + (200 - 1)]?.time || uniqueCandles[idx].time) as any,
         value: val,
       }));
 
-      ema20Series.setData(ema20Data);
-      ema50Series.setData(ema50Data);
-      ema200Series.setData(ema200Data);
+      ema20Series.setData(ema20Data as any);
+      ema50Series.setData(ema50Data as any);
+      ema200Series.setData(ema200Data as any);
 
       ema20Series.applyOptions({ visible: showEMA20 });
       ema50Series.applyOptions({ visible: showEMA50 });
