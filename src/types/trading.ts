@@ -59,4 +59,40 @@ export interface PineScriptItem {
   author: string;
   version: string;
   code: string;
+  pythonCode?: string;
+}
+
+export interface TradeLog {
+  id: string;
+  type: 'LONG' | 'SHORT';
+  entryTime: number;
+  exitTime: number;
+  entryPrice: number;
+  exitPrice: number;
+  pnl: number;
+  pnlPercent: number;
+  exitReason: 'TAKE_PROFIT' | 'STOP_LOSS' | 'SIGNAL_REVERSAL';
+}
+
+export interface BacktestResult {
+  initialCapital: number;
+  finalCapital: number;
+  netProfit: number;
+  netProfitPercent: number;
+  totalTrades: number;
+  winCount: number;
+  lossCount: number;
+  winRate: number;
+  profitFactor: number;
+  maxDrawdown: number;
+  maxDrawdownPercent: number;
+  trades: TradeLog[];
+}
+
+export interface ChartMarker {
+  time: number;
+  position: 'aboveBar' | 'belowBar';
+  color: string;
+  shape: 'arrowUp' | 'arrowDown' | 'circle';
+  text: string;
 }

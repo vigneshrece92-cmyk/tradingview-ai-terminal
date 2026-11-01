@@ -1,14 +1,15 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { CandleData } from '@/types/trading';
+import { CandleData, ChartMarker } from '@/types/trading';
 import { calculateEMA } from '@/lib/indicators';
-import { Eye, EyeOff, Maximize2, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, Maximize2, RefreshCw, Sparkles, TrendingUp, Zap } from 'lucide-react';
 
 interface TradingChartProps {
   symbol: string;
   timeframe: string;
   candles: CandleData[];
+  markers?: ChartMarker[];
   isLoading: boolean;
   onRefresh: () => void;
 }
@@ -17,6 +18,7 @@ export default function TradingChart({
   symbol,
   timeframe,
   candles,
+  markers = [],
   isLoading,
   onRefresh,
 }: TradingChartProps) {
@@ -27,10 +29,17 @@ export default function TradingChart({
   const ema20SeriesRef = useRef<any>(null);
   const ema50SeriesRef = useRef<any>(null);
   const ema200SeriesRef = useRef<any>(null);
+  const bbUpperSeriesRef = useRef<any>(null);
+  const bbLowerSeriesRef = useRef<any>(null);
+  const supertrendSeriesRef = useRef<any>(null);
 
   const [showEMA20, setShowEMA20] = useState(true);
   const [showEMA50, setShowEMA50] = useState(true);
   const [showEMA200, setShowEMA200] = useState(false);
+  const [showBollinger, setShowBollinger] = useState(false);
+  const [showSupertrend, setShowSupertrend] = useState(true);
+  const [showMarkers, setShowMarkers] = useState(true);
+
   const [hoverData, setHoverData] = useState<{
     time?: string;
     open?: number;
@@ -53,7 +62,6 @@ export default function TradingChart({
 
       if (!containerRef.current || !isMounted) return;
 
-      // Clear any existing canvas
       containerRef.current.innerHTML = '';
 
       const chartOptions = {
@@ -79,8 +87,8 @@ export default function TradingChart({
         rightPriceScale: {
           borderColor: '#1e293b',
           scaleMargins: {
-            top: 0.1,
-            bottom: 0.25,
+            top: 0.08,
+            bottom: 0.22,
           },
         },
       };
@@ -98,7 +106,7 @@ export default function TradingChart({
       });
       candleSeriesRef.current = candleSeries;
 
-      // Volume Series (histogram at bottom)
+      // Volume Series
       const volumeSeries = chart.addHistogramSeries({
         color: '#26a69a',
         priceFormat: { type: 'volume' },
@@ -134,10 +142,33 @@ export default function TradingChart({
       });
       ema200SeriesRef.current = ema200Series;
 
-      // Format data for lightweight-charts (must be strictly ascending in time)
+      // Bollinger Bands Series
+      const bbUpperSeries = chart.addLineSeries({
+        color: 'rgba(56, 189, 248, 0.4)',
+        lineWidth: 1,
+        lineStyle: 2,
+        title: 'BB Upper',
+      });
+      bbUpperSeriesRef.current = bbUpperSeries;
+
+      const bbLowerSeries = chart.addLineSeries({
+        color: 'rgba(56, 189, 248, 0.4)',
+        lineWidth: 1,
+        lineStyle: 2,
+        title: 'BB Lower',
+      });
+      bbLowerSeriesRef.current = bbLowerSeries;
+
+      // SuperTrend Series
+      const supertrendSeries = chart.addLineSeries({
+        color: '#10b981',
+        lineWidth: 2,
+        title: 'SuperTrend',
+      });
+      supertrendSeriesRef.current = supertrendSeries;
+
+      // Prepare data
       const sortedCandles = [...candles].sort((a, b) => Number(a.time) - Number(b.time));
-      
-      // Ensure strictly unique timestamps
       const uniqueCandles: CandleData[] = [];
       const seenTimes = new Set();
       for (const c of sortedCandles) {
@@ -183,13 +214,60 @@ export default function TradingChart({
         value: val,
       }));
 
+      // Bollinger Bands calculation (20 period, 2 stdev)
+      const bbUpperData: any[] = [];
+      const bbLowerData: any[] = [];
+      for (let i = 19; i < closes.length; i++) {
+        const slice = closes.slice(i - 19, i + 1);
+        const mean = slice.reduce((a, b) => a + b, 0) / 20;
+        const variance = slice.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / 20;
+        const stdev = Math.sqrt(variance);
+        bbUpperData.push({ time: Number(uniqueCandles[i].time), value: mean + stdev * 2 });
+        bbLowerData.push({ time: Number(uniqueCandles[i].time), value: mean - stdev * 2 });
+      }
+
+      // SuperTrend calculation approximation
+      const supertrendData: any[] = [];
+      let stTrend = 1;
+      for (let i = 10; i < uniqueCandles.length; i++) {
+        const c = uniqueCandles[i];
+        const approxAtr = (c.high - c.low) * 1.5;
+        const basicUpper = (c.high + c.low) / 2 + approxAtr * 3;
+        const basicLower = (c.high + c.low) / 2 - approxAtr * 3;
+        if (c.close > basicUpper) stTrend = 1;
+        else if (c.close < basicLower) stTrend = -1;
+        supertrendData.push({
+          time: Number(c.time),
+          value: stTrend === 1 ? basicLower : basicUpper,
+        });
+      }
+
       ema20Series.setData(ema20Data as any);
       ema50Series.setData(ema50Data as any);
       ema200Series.setData(ema200Data as any);
+      bbUpperSeries.setData(bbUpperData as any);
+      bbLowerSeries.setData(bbLowerData as any);
+      supertrendSeries.setData(supertrendData as any);
 
       ema20Series.applyOptions({ visible: showEMA20 });
       ema50Series.applyOptions({ visible: showEMA50 });
       ema200Series.applyOptions({ visible: showEMA200 });
+      bbUpperSeries.applyOptions({ visible: showBollinger });
+      bbLowerSeries.applyOptions({ visible: showBollinger });
+      supertrendSeries.applyOptions({ visible: showSupertrend });
+
+      // Apply markers if provided
+      if (markers && markers.length > 0 && showMarkers) {
+        candleSeries.setMarkers(
+          markers.map((m) => ({
+            time: Number(m.time),
+            position: m.position,
+            color: m.color,
+            shape: m.shape,
+            text: m.text,
+          })) as any
+        );
+      }
 
       // Crosshair move handler
       chart.subscribeCrosshairMove((param: any) => {
@@ -223,10 +301,8 @@ export default function TradingChart({
         }
       });
 
-      // Fit content
       chart.timeScale().fitContent();
 
-      // Resize observer
       const handleResize = () => {
         if (containerRef.current && chart) {
           chart.applyOptions({
@@ -251,9 +327,9 @@ export default function TradingChart({
       isMounted = false;
       if (chart) chart.remove();
     };
-  }, [candles, symbol, timeframe]);
+  }, [candles, symbol, timeframe, markers, showMarkers]);
 
-  // Toggle EMA visibility
+  // Handle toggles
   useEffect(() => {
     if (ema20SeriesRef.current) ema20SeriesRef.current.applyOptions({ visible: showEMA20 });
   }, [showEMA20]);
@@ -265,6 +341,15 @@ export default function TradingChart({
   useEffect(() => {
     if (ema200SeriesRef.current) ema200SeriesRef.current.applyOptions({ visible: showEMA200 });
   }, [showEMA200]);
+
+  useEffect(() => {
+    if (bbUpperSeriesRef.current) bbUpperSeriesRef.current.applyOptions({ visible: showBollinger });
+    if (bbLowerSeriesRef.current) bbLowerSeriesRef.current.applyOptions({ visible: showBollinger });
+  }, [showBollinger]);
+
+  useEffect(() => {
+    if (supertrendSeriesRef.current) supertrendSeriesRef.current.applyOptions({ visible: showSupertrend });
+  }, [showSupertrend]);
 
   const latestCandle = candles[candles.length - 1] || null;
   const displayData = hoverData || (latestCandle ? {
@@ -303,41 +388,70 @@ export default function TradingChart({
         </div>
 
         {/* Right: Indicator Toggles */}
-        <div className="flex items-center gap-2 mt-1 sm:mt-0">
+        <div className="flex items-center gap-1.5 mt-1 sm:mt-0 flex-wrap">
+          <button
+            onClick={() => setShowSupertrend(!showSupertrend)}
+            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+              showSupertrend ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-slate-800/50 text-slate-500'
+            }`}
+          >
+            <TrendingUp size={11} /> SuperTrend
+          </button>
+
+          <button
+            onClick={() => setShowBollinger(!showBollinger)}
+            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+              showBollinger ? 'bg-sky-400/20 text-sky-300 border border-sky-400/40' : 'bg-slate-800/50 text-slate-500'
+            }`}
+          >
+            BB (20,2)
+          </button>
+
           <button
             onClick={() => setShowEMA20(!showEMA20)}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-all ${
+            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
               showEMA20 ? 'bg-yellow-400/20 text-yellow-300 border border-yellow-400/40' : 'bg-slate-800/50 text-slate-500'
             }`}
           >
-            {showEMA20 ? <Eye size={12} /> : <EyeOff size={12} />} EMA 20
+            EMA 20
           </button>
 
           <button
             onClick={() => setShowEMA50(!showEMA50)}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-all ${
-              showEMA50 ? 'bg-sky-400/20 text-sky-300 border border-sky-400/40' : 'bg-slate-800/50 text-slate-500'
+            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
+              showEMA50 ? 'bg-cyan-400/20 text-cyan-300 border border-cyan-400/40' : 'bg-slate-800/50 text-slate-500'
             }`}
           >
-            {showEMA50 ? <Eye size={12} /> : <EyeOff size={12} />} EMA 50
+            EMA 50
           </button>
 
           <button
             onClick={() => setShowEMA200(!showEMA200)}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-all ${
+            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
               showEMA200 ? 'bg-purple-400/20 text-purple-300 border border-purple-400/40' : 'bg-slate-800/50 text-slate-500'
             }`}
           >
-            {showEMA200 ? <Eye size={12} /> : <EyeOff size={12} />} EMA 200
+            EMA 200
           </button>
+
+          {markers.length > 0 && (
+            <button
+              onClick={() => setShowMarkers(!showMarkers)}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                showMarkers ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-slate-800/50 text-slate-500'
+              }`}
+            >
+              <Zap size={11} /> {markers.length} Signals
+            </button>
+          )}
 
           <button
             onClick={onRefresh}
             disabled={isLoading}
             title="Reload Candlestick Feed"
-            className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+            className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors ml-1"
           >
-            <RefreshCw size={14} className={isLoading ? 'animate-spin text-blue-400' : ''} />
+            <RefreshCw size={13} className={isLoading ? 'animate-spin text-blue-400' : ''} />
           </button>
         </div>
       </div>
