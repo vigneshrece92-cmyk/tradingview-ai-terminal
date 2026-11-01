@@ -1,8 +1,9 @@
 import { BacktestResult, CandleData, ChartMarker, TradeLog } from '@/types/trading';
 import { calculateEMA, calculateRSI } from './indicators';
+import { calculateVolumeProfile } from './orderflow';
 
 export interface BacktestConfig {
-  strategy: 'supertrend' | 'bollinger' | 'ema_cross' | 'rsi_mean_reversion';
+  strategy: 'volume_profile_delta' | 'supertrend' | 'bollinger' | 'ema_cross' | 'rsi_mean_reversion';
   initialCapital: number;
   riskPercent: number; // e.g. 2%
   tpRatio: number; // e.g. 2.0 (1:2 R:R)
@@ -123,6 +124,17 @@ export function runBacktest(candles: CandleData[], config: BacktestConfig): { re
 
         if (e20Prev <= e50Prev && e20Now > e50Now) signal = 'LONG';
         else if (allowShorts && e20Prev >= e50Prev && e20Now < e50Now) signal = 'SHORT';
+      } else if (strategy === 'volume_profile_delta') {
+        const vp = calculateVolumeProfile(candles.slice(Math.max(0, i - 40), i + 1), 20, 0.70);
+        const isBull = current.close >= current.open;
+        const buyFrac = isBull ? 0.6 : 0.4;
+        const delta = (current.volume || 1000) * (buyFrac - (1 - buyFrac));
+
+        if (current.low <= vp.val * 1.004 && current.close >= vp.val && delta > 0) {
+          signal = 'LONG';
+        } else if (allowShorts && current.high >= vp.vah * 0.996 && current.close <= vp.vah && delta < 0) {
+          signal = 'SHORT';
+        }
       } else if (strategy === 'rsi_mean_reversion') {
         const rsiSlice = closes.slice(i - 15, i + 1);
         const rsiVal = calculateRSI(rsiSlice, 14);

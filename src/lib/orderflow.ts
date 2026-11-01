@@ -1,4 +1,4 @@
-import { CandleData, OrderFlowBar, VolumeProfileBucket, VolumeProfileData, WhaleTapePrint } from '@/types/trading';
+import { CandleData, ChartMarker, OrderFlowBar, VolumeProfileBucket, VolumeProfileData, WhaleTapePrint } from '@/types/trading';
 
 /**
  * Institutional Visible Range Volume Profile (VRVP) Calculation
@@ -199,3 +199,97 @@ export function generateWhalePrints(currentPrice: number, count = 12): WhaleTape
 
   return prints.reverse(); // Newest first
 }
+
+/**
+ * Institutional Buy/Sell Signal Engine based on Volume Profile & Order Flow Delta Confluence
+ * Rules:
+ * 1. BUY: Price tests or dips into VAL (Value Area Low), shows lower wick absorption,
+ *    and candle delta turns positive (buyers absorbing supply). Target: POC or VAH.
+ * 2. SELL: Price tests VAH (Value Area High), shows upper wick rejection,
+ *    and candle delta turns negative (sellers taking control). Target: POC or VAL.
+ * 3. POC REJECTION: Dynamic continuation signals when defending the POC.
+ */
+export function generateVolumeProfileSignals(
+  candles: CandleData[],
+  vp: VolumeProfileData
+): ChartMarker[] {
+  if (candles.length < 15 || !vp || vp.poc === 0) return [];
+
+  const markers: ChartMarker[] = [];
+  const valThreshold = vp.val;
+  const vahThreshold = vp.vah;
+  const pocThreshold = vp.poc;
+
+  let lastSignalType: 'BUY' | 'SELL' | null = null;
+  let lastSignalIndex = -10;
+
+  for (let i = 5; i < candles.length; i++) {
+    // Need at least 3 candles separation
+    if (i - lastSignalIndex < 3) continue;
+
+    const c = candles[i];
+    const prev = candles[i - 1];
+    const candleRange = c.high - c.low || 1;
+    const lowerWick = Math.min(c.open, c.close) - c.low;
+    const upperWick = c.high - Math.max(c.open, c.close);
+    
+    // Estimate delta
+    const isBull = c.close >= c.open;
+    const buyVol = Math.round((c.volume || 1000) * (isBull ? 0.6 : 0.4));
+    const sellVol = Math.round((c.volume || 1000) - buyVol);
+    const delta = buyVol - sellVol;
+
+    // --- BUY SETUP: VAL Absorption & Reversal ---
+    const testedVAL = c.low <= valThreshold * 1.004 && c.close >= valThreshold * 0.998;
+    const hasAbsorptionWick = lowerWick >= candleRange * 0.30;
+    const isBullishReversal = isBull && delta > 0;
+
+    if (testedVAL && (hasAbsorptionWick || isBullishReversal) && lastSignalType !== 'BUY') {
+      markers.push({
+        time: Number(c.time),
+        position: 'belowBar',
+        color: '#10b981',
+        shape: 'arrowUp',
+        text: `BUY @ VAL [TP: ${vp.poc.toFixed(0)}]`,
+      });
+      lastSignalType = 'BUY';
+      lastSignalIndex = i;
+      continue;
+    }
+
+    // --- SELL SETUP: VAH Exhaustion & Rejection ---
+    const testedVAH = c.high >= vahThreshold * 0.996 && c.close <= vahThreshold * 1.002;
+    const hasExhaustionWick = upperWick >= candleRange * 0.30;
+    const isBearishReversal = !isBull && delta < 0;
+
+    if (testedVAH && (hasExhaustionWick || isBearishReversal) && lastSignalType !== 'SELL') {
+      markers.push({
+        time: Number(c.time),
+        position: 'aboveBar',
+        color: '#ef4444',
+        shape: 'arrowDown',
+        text: `SELL @ VAH [TP: ${vp.poc.toFixed(0)}]`,
+      });
+      lastSignalType = 'SELL';
+      lastSignalIndex = i;
+      continue;
+    }
+
+    // --- SECONDARY BUY: POC Bounce in Uptrend ---
+    const bouncePOC = prev.low <= pocThreshold * 1.002 && c.close > pocThreshold && isBull && delta > 0;
+    if (bouncePOC && lastSignalType !== 'BUY' && i - lastSignalIndex >= 5) {
+      markers.push({
+        time: Number(c.time),
+        position: 'belowBar',
+        color: '#38bdf8',
+        shape: 'arrowUp',
+        text: `BUY @ POC Defense`,
+      });
+      lastSignalType = 'BUY';
+      lastSignalIndex = i;
+    }
+  }
+
+  return markers;
+}
+

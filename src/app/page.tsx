@@ -13,6 +13,7 @@ import RiskCalculator from '@/components/RiskCalculator';
 import OrderFlowPanel from '@/components/OrderFlowPanel';
 import { CandleData, ChartMarker, ScreenerItem, TechnicalAnalysis, Timeframe } from '@/types/trading';
 import { evaluateTechnicalAnalysis } from '@/lib/indicators';
+import { calculateVolumeProfile, generateVolumeProfileSignals } from '@/lib/orderflow';
 import {
   Activity,
   BarChart2,
@@ -66,6 +67,9 @@ export default function Home() {
         setCandles(data.candles);
         const ta = evaluateTechnicalAnalysis(symbol, data.candles);
         setTechnicalAnalysis(ta);
+        const vp = calculateVolumeProfile(data.candles, 26, 0.70);
+        const signals = generateVolumeProfileSignals(data.candles, vp);
+        setChartMarkers(signals);
       }
     } catch (err) {
       console.error('Failed to fetch candles:', err);

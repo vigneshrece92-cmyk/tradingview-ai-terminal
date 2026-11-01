@@ -98,6 +98,7 @@ export default function BacktestEngine({
             onChange={(e) => setStrategy(e.target.value as any)}
             className="px-2.5 py-1.5 bg-[#090d14] border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:border-emerald-500 font-medium"
           >
+            <option value="volume_profile_delta">⭐ Volume Profile + Delta (Recommended)</option>
             <option value="supertrend">SuperTrend Momentum</option>
             <option value="bollinger">Bollinger Squeeze Breakout</option>
             <option value="ema_cross">EMA 20/50 Golden Cross</option>
